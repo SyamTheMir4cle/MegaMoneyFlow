@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from django.contrib.auth.models import User
 from .models import Akun, Jurnal
 from .serializers import AkunSerializer, JurnalSerializer
 
@@ -11,5 +12,6 @@ class JurnalViewSet(viewsets.ModelViewSet):
     serializer_class = JurnalSerializer
 
     def perform_create(self, serializer):
-        # Otomatis set user yang login sebagai pembuat jurnal
-        serializer.save(dibuat_oleh=self.request.user)
+        # Untuk MVP, kita hardcode user pertama sebagai pembuat jurnal
+        user = User.objects.first() 
+        serializer.save(dibuat_oleh=user) # <-- UBAH BARIS INI

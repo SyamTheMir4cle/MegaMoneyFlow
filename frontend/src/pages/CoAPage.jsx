@@ -1,115 +1,153 @@
 // src/pages/CoAPage.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { gsap } from 'gsap';
+import toast from 'react-hot-toast';
 import apiClient from '../api/apiClient';
 
+// Impor komponen UI kustom kita
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Table, { TableRow, TableCell } from '../components/ui/Table';
+
 function CoAPage() {
-  // 1. STATE MANAGEMENT
-  const [accounts, setAccounts] = useState([]); // Menyimpan daftar akun dari API
-  const [newAccount, setNewAccount] = useState({ // Menyimpan data dari form
-    kode_akun: '',
-    nama_akun: '',
-    kategori: '',
-  });
-  const [isLoading, setIsLoading] = useState(true); // Status loading data
+  // === STATE MANAGEMENT ===
+  // Menyimpan daftar akun dari API
+  const [accounts, setAccounts] = useState([]);
+  // Menyimpan data dari form tambah akun baru
+  const [newAccount, setNewAccount] = useState({ kode_akun: '', nama_akun: '', kategori: '' });
+  // Status loading untuk pengambilan data awal
+  const [isLoading, setIsLoading] = useState(true);
+  // Status loading khusus untuk proses submit form
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 2. DATA FETCHING (EFFECT)
-  useEffect(() => {
-    fetchAccounts();
-  }, []); // [] artinya efek ini hanya berjalan sekali saat komponen dimuat
+  // === REFS UNTUK ANIMASI ===
+  const containerRef = useRef(null);
 
+  // === DATA FETCHING ===
   const fetchAccounts = async () => {
     try {
-      setIsLoading(true);
+      // Tidak set isLoading di sini agar tidak memicu animasi ulang saat refresh
       const response = await apiClient.get('/akun/');
       setAccounts(response.data);
     } catch (error) {
       console.error('Gagal mengambil data akun:', error);
+      toast.error('Gagal memuat daftar akun.');
     } finally {
       setIsLoading(false);
     }
   };
+  
+  // Efek untuk mengambil data saat komponen pertama kali dimuat
+  useEffect(() => {
+    fetchAccounts();
+  }, []); // [] artinya hanya berjalan sekali
 
-  // 3. HANDLER FUNCTIONS
+  // === ANIMASI ===
+  // Efek untuk menjalankan animasi GSAP setelah data selesai dimuat
+  useEffect(() => {
+    if (!isLoading && containerRef.current) {
+      gsap.from(containerRef.current.children, {
+        duration: 0.8,
+        y: 50,
+        opacity: 0,
+        stagger: 0.2,
+        ease: 'power3.out',
+      });
+    }
+  }, [isLoading]); // Berjalan setiap kali status isLoading berubah
+
+  // === HANDLER FUNCTIONS ===
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewAccount({ ...newAccount, [name]: value });
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Mencegah form me-refresh halaman
-    if (!newAccount.kode_akun || !newAccount.nama_akun || !newAccount.kategori) {
-      alert('Semua field wajib diisi!');
+    e.preventDefault();
+    if (!newAccount.kode_akun || !newAccount.nama_akun) {
+      toast.error('Kode dan Nama Akun wajib diisi!');
       return;
     }
+    
+    setIsSubmitting(true);
+    const loadingToast = toast.loading('Menyimpan akun...');
+
     try {
       await apiClient.post('/akun/', newAccount);
-      alert('Akun berhasil ditambahkan!');
+      toast.dismiss(loadingToast);
+      toast.success('Akun berhasil ditambahkan!');
       setNewAccount({ kode_akun: '', nama_akun: '', kategori: '' }); // Reset form
       fetchAccounts(); // Ambil ulang daftar akun terbaru
     } catch (error) {
+      toast.dismiss(loadingToast);
       console.error('Gagal menambahkan akun:', error);
-      alert('Gagal menambahkan akun. Cek konsol untuk detail.');
+      toast.error('Gagal menambahkan akun. Cek konsol untuk detail.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // 4. JSX (RENDER)
-  return (
-    <div>
-      <h2>Daftar Akun Perkiraan (CoA)</h2>
-      
-      <form onSubmit={handleSubmit} style={{ marginBottom: '20px' }}>
-        <h3>Tambah Akun Baru</h3>
-        <input
-          type="text"
-          name="kode_akun"
-          value={newAccount.kode_akun}
-          onChange={handleInputChange}
-          placeholder="Kode Akun (e.g., 1-10100)"
-          required
-        />
-        <input
-          type="text"
-          name="nama_akun"
-          value={newAccount.nama_akun}
-          onChange={handleInputChange}
-          placeholder="Nama Akun (e.g., Kas)"
-          required
-        />
-        <input
-          type="text"
-          name="kategori"
-          value={newAccount.kategori}
-          onChange={handleInputChange}
-          placeholder="Kategori (e.g., Aset)"
-          required
-        />
-        <button type="submit">Simpan Akun</button>
-      </form>
+  const tableHeaders = ['Kode Akun', 'Nama Akun', 'Kategori'];
 
-      <h3>Daftar Akun</h3>
-      {isLoading ? (
-        <p>Loading...</p>
-      ) : (
-        <table border="1" cellPadding="5" cellSpacing="0" width="100%">
-          <thead>
-            <tr>
-              <th>Kode Akun</th>
-              <th>Nama Akun</th>
-              <th>Kategori</th>
-            </tr>
-          </thead>
-          <tbody>
+  // === JSX (RENDER) ===
+  return (
+    <div ref={containerRef}>
+      <h2 className="text-3xl font-bold text-slate-700 mb-6">
+        Daftar Akun Perkiraan (CoA)
+      </h2>
+      
+      <Card className="mb-8">
+        <form onSubmit={handleSubmit}>
+          <h3 className="text-xl mb-4 font-semibold text-slate-600">Tambah Akun Baru</h3>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-500">Kode Akun</label>
+              <Input
+                type="text" name="kode_akun" value={newAccount.kode_akun}
+                onChange={handleInputChange} placeholder="e.g., 1-10100" required
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-500">Nama Akun</label>
+              <Input
+                type="text" name="nama_akun" value={newAccount.nama_akun}
+                onChange={handleInputChange} placeholder="e.g., Kas BCA" required
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-500">Kategori</label>
+              <Input
+                type="text" name="kategori" value={newAccount.kategori}
+                onChange={handleInputChange} placeholder="e.g., Aset"
+              />
+            </div>
+            <div className="pt-2">
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Akun'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Card>
+
+      <Card>
+        <h3 className="text-xl mb-4 font-semibold text-slate-600">Daftar Akun</h3>
+        {isLoading ? (
+          <p className="text-center text-gray-500">Memuat data akun...</p>
+        ) : (
+          <Table headers={tableHeaders}>
             {accounts.map((account) => (
-              <tr key={account.id}>
-                <td>{account.kode_akun}</td>
-                <td>{account.nama_akun}</td>
-                <td>{account.kategori}</td>
-              </tr>
+              <TableRow key={account.id}>
+                <TableCell>{account.kode_akun}</TableCell>
+                <TableCell className="font-medium">{account.nama_akun}</TableCell>
+                <TableCell>{account.kategori}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      )}
+          </Table>
+        )}
+      </Card>
     </div>
   );
 }
